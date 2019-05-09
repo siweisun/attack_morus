@@ -1,0 +1,185 @@
+N := 8; // Number of variables
+F2 := GF(2);
+
+B<[x]>   := PolynomialRing(F2, N);
+BB<[y]> := PolynomialRing(F2, N);
+
+f := x[1]*x[2] + x[1]*x[3] + x[2]*x[4] + x[1] + x[2] + 1;  // input your quadratic Boolean function here
+f := x[1]*x[2] + x[2]*x[3] + x[2]*x[4] + x[1] + x[2] + 1;  // input your quadratic Boolean function here
+
+f := x[1]*x[2] + x[2]*x[3] + x[2]*x[4] + x[1]*x[5] + x[4]*x[6] + x[1]*x[7] + x[7]*x[8] + x[1] + x[2] + 1;
+
+// Given a ploynomail, transform it into Boolean form. 
+// e.g., x[1]^2 * x[2] + 1 --> x[1] * x[2] + 1
+BooleanPoly := function(f, vars)
+	assert TotalDegree(f) le 2;
+	g := f;
+	for v in vars do
+		if MonomialCoefficient(f, v^2) eq 1 then
+			g := g + v^2 + v;
+		end if;
+	end for;
+	return g;
+end function;
+
+Qua := function(f)
+	assert TotalDegree(f) le 2;
+	terms := Monomials(f);
+	
+	g := 0;
+	for t in terms do
+		if TotalDegree(t) eq 2 then
+			g := g + t;
+		end if;
+	end for;
+	return g;
+end function;
+
+Lin := function(f)
+	assert TotalDegree(f) le 2;
+	return f + Qua(f);
+end function;
+
+Sigma := function(f, vars, v)
+	assert TotalDegree(f) le 2;
+	g := Coefficient(f, v, 1);
+	g := g + MonomialCoefficient(g, 1);
+	return Length(g);
+end function;
+
+Qefficient := function(f, v)
+	assert TotalDegree(f) le 2;
+	qf := Qua(f);
+	g := Coefficient(qf, v, 1);
+	g := g + MonomialCoefficient(g, 1);   //if "1" is one term of g, remove it
+	return g;
+end function;
+
+
+PickVariable := function(f, vars)
+	assert TotalDegree(f) le 2;
+	var, j := Max([Sigma(f, vars, v): v in vars]);
+	return vars[j], j;
+end function;
+
+PickVariable(f, x);
+
+MonomialToSequence := function(m, vars)
+	assert TotalDegree(m) le 2;
+	assert Length(m) eq 1;
+	return [Coefficient(m, v, 1) ne 0 select 1 else 0: v in vars];
+end function;
+
+//> MonomialToSequence(x[1]*x[2], x);
+//[ 1, 1, 0, 0 ]
+//>
+//>
+//>
+//> x;
+//[
+//    x[1],
+//    x[2],
+//    x[3],
+//    x[4]
+//]
+//>
+
+
+MonomialToSequence(x[1]*x[2], x);
+MonomialToSequence(x[2]*x[3], x);
+
+Substitute := function(f, xvars, exprList)
+	assert TotalDegree(f) le 2;
+	assert (#xvars) eq (#exprList);
+	L := [MonomialToSequence(t, xvars) : t in Terms(f)];
+	
+	g := B!0;
+	for m in L do
+		h := B!1;
+		for i in [1..#xvars] do
+			if m[i] eq 1 then
+				h := h * exprList[i];
+			end if;
+		end for;
+		g := g + h;
+	end for;
+
+	return BooleanPoly(g, xvars);
+end function;
+
+//s := [i gt 2 select 1 else 0: i in [1..10]];
+
+Substitute(f, x, [x[1], x[2]+x[3], x[3], x[4]]);
+
+TransformDisjoint := function(f, vars)
+	print "The input poly is:";
+	print f;
+	print "\n";
+
+	assert TotalDegree(f) le 2;
+	g := f;
+	
+	i := 0;
+	v := PickVariable(g, vars);
+	
+
+	while Sigma(g, vars, v) ge 2 do
+		print "Let's pick variable:";
+		print v;
+		print "\n";
+		
+		i := i + 1;
+		subEqn := Qefficient(g, v);
+		subEqnSystem := vars;
+		anchor := LeadingTerm(subEqn);
+		
+		for j in [1..#vars] do
+			if subEqnSystem[j] eq anchor then
+				subEqnSystem[j] := subEqn;
+			end if;	
+		end for;
+		print i;
+		print "The substitution:";
+		print subEqnSystem;
+		print "\n";
+
+		g := Substitute(g, vars, subEqnSystem);
+		g := BooleanPoly(g, vars);
+
+		print "after substitution:";
+		print g;
+		print "\n";	
+
+		if Sigma(g, vars, anchor) ge 2 then
+			i := i + 1;
+			subEqn := Qefficient(g, anchor);
+			subEqnSystem := vars;
+			anchor := LeadingTerm(subEqn);
+		
+			for j in [1..#vars] do
+				if subEqnSystem[j] eq v then
+					subEqnSystem[j] := subEqn;
+				end if;	
+			end for;
+			
+			print i;
+			print "The substitution:";
+			print subEqnSystem;
+			print "\n";
+
+			g := Substitute(g, vars, subEqnSystem);
+			g := BooleanPoly(g, vars);
+			print "after substitution:";
+			print g;
+			print "\n";	
+		end if;
+		v := PickVariable(g, vars);
+	end while;
+	return g;
+end function;
+
+TransformDisjoint(f, x);
+
+
+
+
